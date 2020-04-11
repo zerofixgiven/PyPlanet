@@ -35,3 +35,25 @@ class Score(Model):
 
 	class Meta:
 		db_table = 'stats_scores'
+
+
+class Rank(Model):
+	player = ForeignKeyField(Player, index=True)
+	"""
+	Player that has driven this time.
+	"""
+
+	average = IntegerField()
+	"""
+	Average map ranking.
+	"""
+
+	calculated_at = DateTimeField(
+		default=datetime.datetime.now,
+	)
+	"""
+	When is the time driven?
+	"""
+
+	class Meta:
+		db_table = 'stats_ranks'
