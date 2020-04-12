@@ -2,6 +2,7 @@
 Trackmania app component.
 """
 import logging
+import math
 import datetime
 from peewee import fn
 
@@ -32,7 +33,7 @@ class TrackmaniaComponent:
 		self.app = app
 
 		self.setting_records_required = Setting(
-			'minimum_records_required', 'Minimum of records required to acquire a rank.', Setting.CAT_BEHAVIOUR, type=int,
+			'minimum_records_required', 'Minimum records to acquire ranking', Setting.CAT_BEHAVIOUR, type=int,
 			description='Minimum of records required to acquire a rank (minimum 3 records).',
 			default=5
 		)
@@ -55,6 +56,7 @@ class TrackmaniaComponent:
 		await self.app.instance.command_manager.register(
 			# Command('stats', target=self.open_stats),
 			Command('rank', target=self.chat_rank, description='Displays your current server rank.'),
+			Command('nextrank', target=self.chat_nextrank, description='Displays the player ahead of you in the server ranking.'),
 			Command('topsums', target=self.chat_topsums, description='Displays a list of top record players.'),
 			Command('topranks', target=self.chat_topranks, description='Displays a list of top ranked players.'),
 			Command(command='scoreprogression', aliases=['progression'], target=self.chat_score_progression,
@@ -120,6 +122,7 @@ class TrackmaniaComponent:
 				LocalRecord.select(LocalRecord.map, LocalRecord.player, LocalRecord.score)
 					.where(LocalRecord.map_id == map_on_server.id)
 					.order_by(LocalRecord.map_id.asc(), LocalRecord.score.asc())
+					.limit(maximum_record_rank)
 			))
 
 			for map_record in [eligible_record for eligible_record in map_records if (eligible_record.player_id in eligible_players_ids)]:
@@ -177,4 +180,32 @@ class TrackmaniaComponent:
 		player_rank_index = await Rank.objects.count(Rank.select(Rank).where(Rank.average < player_rank.average))
 		total_ranked_players = await Rank.objects.count(Rank.select(Rank))
 
-		await self.app.instance.chat('$ff0Your server rank is $fff{}$ff0 of $fff{}$ff0, average: $fff{}$ff0.'.format(player_rank_index, total_ranked_players, player_rank_average))
+		await self.app.instance.chat('$f80Your server rank is $fff{}$f80 of $fff{}$f80, average: $fff{}$f80'.format(
+			player_rank_index, total_ranked_players, player_rank_average), player)
+
+	async def chat_nextrank(self, player, *args, **kwargs):
+		player_ranks = await Rank.execute(Rank.select().where(Rank.player == player.get_id()))
+
+		if len(player_ranks) == 0:
+			await self.app.instance.chat('$f00$iYou do not have a server rank yet!', player)
+			return
+
+		player_rank = player_ranks[0]
+		next_ranked_players = await Rank.execute(
+			Rank.select(Rank, Player)
+				.join(Player)
+				.where(Rank.average < player_rank.average)
+				.order_by(Rank.average.desc())
+				.limit(1))
+
+		if len(next_ranked_players) == 0:
+			await self.app.instance.chat('$f00$iThere is no better ranked player than you!', player)
+			return
+
+		next_ranked = next_ranked_players[0]
+		next_player_rank_average = '{:0.2f}'.format((next_ranked.average / 10000))
+		next_player_rank_index = await Rank.objects.count(Rank.select(Rank).where(Rank.average < next_ranked.average))
+		next_player_rank_difference = math.ceil((player_rank.average - next_ranked.average) / 10000 * len(self.app.instance.map_manager.maps))
+
+		await self.app.instance.chat('$f80The next ranked player is $<$fff{}$>$f80 ($fff{}$f80), average: $fff{}$f80 [$fff-{} $f80RP]'.format(
+			next_ranked.player.nickname, next_player_rank_index, next_player_rank_average, next_player_rank_difference), player)
