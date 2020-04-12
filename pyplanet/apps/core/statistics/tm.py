@@ -5,13 +5,16 @@ import logging
 import datetime
 from peewee import fn
 
+from pyplanet.apps.core.maniaplanet.models import Player
 from pyplanet.apps.core.statistics.models import Score, Rank
 from pyplanet.apps.core.statistics.views.dashboard import StatsDashboardView
+from pyplanet.apps.core.statistics.views.ranks import TopRanksView
 from pyplanet.apps.core.statistics.views.records import TopSumsView
 from pyplanet.apps.core.statistics.views.score import StatsScoresListView
 from pyplanet.apps.core.trackmania.callbacks import finish
 from pyplanet.apps.core.maniaplanet.callbacks import map
 from pyplanet.contrib.command import Command
+from pyplanet.contrib.setting import Setting
 
 from pyplanet.apps.contrib.local_records import LocalRecord
 
@@ -27,6 +30,12 @@ class TrackmaniaComponent:
 		:type app: pyplanet.apps.core.statistics.Statistics
 		"""
 		self.app = app
+
+		self.setting_records_required = Setting(
+			'minimum_records_required', 'Minimum of records required to acquire a rank.', Setting.CAT_BEHAVIOUR, type=int,
+			description='Minimum of records required to acquire a rank (minimum 3 records).',
+			default=5
+		)
 
 	async def on_init(self):
 		pass
@@ -45,8 +54,8 @@ class TrackmaniaComponent:
 					description='Displays your time/score progression on the current map.'),
 		)
 
-		# Calculate server ranks.
-		await self.calculate_server_ranks()
+		# Register settings
+		await self.app.context.setting.register(self.setting_records_required)
 
 	async def on_finish(self, player, race_time, lap_time, cps, flow, raw, **kwargs):
 		# Register the score of the player.
@@ -65,20 +74,18 @@ class TrackmaniaComponent:
 		# Save calculation start time.
 		start_time = datetime.datetime.now()
 
-		# Retrieve settings.
-		# TODO: retrieve max rank from local records.
-		# TODO: add min. record count as setting.
-		minimum_records_required = 3
-		maximum_record_rank = 100
-
 		# Truncate the ranking table.
-		#Rank..truncate_table()
-		#await Rank.execute(Rank.truncate_table())
-		#await Rank.delete().execute()
+		await Rank.execute(Rank.delete())
 
 		# Rankings depend on the local records.
 		if 'local_records' not in self.app.instance.apps.apps:
 			return
+
+		# Retrieve settings.
+		# TODO: retrieve max rank from local records.
+		minimum_records_required_setting = await self.setting_records_required.get_value()
+		minimum_records_required = minimum_records_required_setting if minimum_records_required_setting >= 3 else 3
+		maximum_record_rank = await self.app.instance.apps.apps['local_records'].setting_record_limit.get_value()
 
 		# Retrieve all players eligible for a ranking (min. 3 records).
 		eligible_players = await LocalRecord.execute(
@@ -108,16 +115,20 @@ class TrackmaniaComponent:
 				if map_player_rank <= maximum_record_rank:
 					player_record_ranks[map_record.player_id].append(map_player_rank)
 
+		calculated_ranks = []
+
 		# Determine ranking average and submit rankings to the database.
 		for player_id in player_record_ranks:
 			player_ranked_records = len(player_record_ranks[player_id])
 			player_average_rank = (sum(player_record_ranks[player_id]) + ((server_map_count - player_ranked_records) * maximum_record_rank)) / server_map_count
 			player_average_rank = round(player_average_rank * 10000)
 
-			await Rank(
-				player=player_id,
-				average=player_average_rank
-			).save()
+			calculated_ranks.append({
+				'player': player_id,
+				'average': player_average_rank
+			})
+
+		await Rank.objects.execute(Rank.insert_many(calculated_ranks))
 
 		logger.info('[RANKING] Total time elapsed: {}ms'.format((datetime.datetime.now() - start_time).total_seconds() * 1000))
 
@@ -135,6 +146,6 @@ class TrackmaniaComponent:
 		await view.display(player)
 
 	async def topranks(self, player, *args, **kwargs):
-		return
-		#view = TopSumsView(self.app, player, await self.app.processor.get_topsums())
-		#await view.display(player)
+		top_ranks = await Rank.objects.execute(Rank.select(Rank, Player).join(Player).order_by(Rank.average.asc()).limit(100))
+		view = TopRanksView(self.app, player, top_ranks)
+		await view.display(player)
