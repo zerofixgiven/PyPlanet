@@ -44,6 +44,12 @@ class TrackmaniaComponent:
 			default=True
 		)
 
+		self.setting_topranks_limit = Setting(
+			'topranks_limit', 'Maximum rank to display in topranks', Setting.CAT_BEHAVIOUR, type=int,
+			description='Amount of ranks to display in the topranks view.',
+			default=100
+		)
+
 	async def on_init(self):
 		pass
 
@@ -64,7 +70,7 @@ class TrackmaniaComponent:
 		)
 
 		# Register settings
-		await self.app.context.setting.register(self.setting_records_required, self.setting_chat_announce)
+		await self.app.context.setting.register(self.setting_records_required, self.setting_chat_announce, self.setting_topranks_limit)
 
 	async def on_finish(self, player, race_time, lap_time, cps, flow, raw, **kwargs):
 		# Register the score of the player.
@@ -161,7 +167,8 @@ class TrackmaniaComponent:
 		await view.display(player)
 
 	async def chat_topranks(self, player, *args, **kwargs):
-		top_ranks = await Rank.execute(Rank.select(Rank, Player).join(Player).order_by(Rank.average.asc()).limit(100))
+		top_ranks_limit = await self.setting_topranks_limit.get_value()
+		top_ranks = await Rank.execute(Rank.select(Rank, Player).join(Player).order_by(Rank.average.asc()).limit(top_ranks_limit))
 		view = TopRanksView(self.app, player, top_ranks)
 		await view.display(player)
 
@@ -177,7 +184,7 @@ class TrackmaniaComponent:
 
 		player_rank = player_ranks[0]
 		player_rank_average = '{:0.2f}'.format((player_rank.average / 10000))
-		player_rank_index = await Rank.objects.count(Rank.select(Rank).where(Rank.average < player_rank.average))
+		player_rank_index = (await Rank.objects.count(Rank.select(Rank).where(Rank.average < player_rank.average)) + 1)
 		total_ranked_players = await Rank.objects.count(Rank.select(Rank))
 
 		await self.app.instance.chat('$f80Your server rank is $fff{}$f80 of $fff{}$f80, average: $fff{}$f80'.format(
@@ -204,7 +211,7 @@ class TrackmaniaComponent:
 
 		next_ranked = next_ranked_players[0]
 		next_player_rank_average = '{:0.2f}'.format((next_ranked.average / 10000))
-		next_player_rank_index = await Rank.objects.count(Rank.select(Rank).where(Rank.average < next_ranked.average))
+		next_player_rank_index = (await Rank.objects.count(Rank.select(Rank).where(Rank.average < next_ranked.average)) + 1)
 		next_player_rank_difference = math.ceil((player_rank.average - next_ranked.average) / 10000 * len(self.app.instance.map_manager.maps))
 
 		await self.app.instance.chat('$f80The next ranked player is $<$fff{}$>$f80 ($fff{}$f80), average: $fff{}$f80 [$fff-{} $f80RP]'.format(
