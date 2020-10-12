@@ -3,9 +3,9 @@ from pyplanet.views.generics.widget import WidgetView
 
 
 class SectorTimesWidget(WidgetView):
-	widget_x = 20
-	widget_y = -70
-
+	widget_x = 18
+	widget_y = -73.9
+    
 	template_name = 'sector_times/sector_times.xml'
 
 	def __init__(self, app):
