@@ -12,6 +12,7 @@ from pyplanet.conf import settings
 from pyplanet.contrib import CoreContrib
 from pyplanet.contrib.map.exceptions import MapNotFound, MapException, ModeIncompatible
 from pyplanet.core.exceptions import ImproperlyConfigured
+from pyplanet.utils import gbxparser
 
 
 class MapManager(CoreContrib):
@@ -168,6 +169,10 @@ class MapManager(CoreContrib):
 					Map.select().where(Map.uid << [m['uid'] for m in rows])
 				))
 
+			# Set author_nickname from gbx file
+			for map in maps:
+				await self.update_nickname(map)
+
 			async with self.lock:
 				self._maps = set(maps)
 
@@ -204,9 +209,20 @@ class MapManager(CoreContrib):
 							price=details['CopperPrice'], map_type=details['MapType'], map_style=details['MapStyle'],
 							mx_id=mx_id,
 						)
+
+						await self.update_nickname(map_instance)
+
 						self._maps.add(map_instance)
 						updated.append(map_instance)
 		return updated
+
+	async def update_nickname(self, map):
+		if map.author_nickname == None:
+			async with self._instance.storage.open_map(map.file) as map_fh:
+				parser = gbxparser.GbxParser(buffer=map_fh)
+				author_nickname = (await parser.parse())['author_nickname']
+				setattr(map, 'author_nickname', author_nickname)
+				await map.save()
 
 	async def get_map(self, uid=None):
 		"""
