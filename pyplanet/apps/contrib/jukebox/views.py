@@ -146,16 +146,16 @@ class MapListView(ManualListView):
 			},
 			{
 				'name': 'Author',
-				'index': 'author_login',
+				'index': 'author_nickname',
 				'sorting': True,
 				'searching': True,
 				'search_strip_styles': True,
 				'renderer': lambda row, field:
-				row['author_login'],
+				#row['author_login'],
 				# TODO: Activate after resolving #83.
-				# row['author_nickname']
-				# if 'author_nickname' in row and row['author_nickname'] and len(row['author_nickname'])
-				# else row['author_login'],
+				row['author_nickname']
+				if 'author_nickname' in row and row['author_nickname'] and len(row['author_nickname'])
+				else row['author_login'],
 				'width': 45,
 			},
 		]
@@ -181,6 +181,7 @@ class MapListView(ManualListView):
 			if value is None:
 				return ''
 			if isinstance(value, (int, float)) and not math.isnan(value):
+				prefix = ''
 				if value > 0.0:
 					prefix = '$6CF'
 				elif value < 0.0:
