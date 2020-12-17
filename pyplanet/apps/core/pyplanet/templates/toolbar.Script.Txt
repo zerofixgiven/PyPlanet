@@ -21,12 +21,12 @@ main() {
     "player_toolbar_bar_button_extend" => "Vote for extending the Time Limit",
     "player_toolbar_bar_button_skip" => "Vote for a skip map",
 
-	  "player_toolbar_bar_button_topdons" => "View list of top Donators",
-	  "player_toolbar_bar_button_topsums" => "View Server Rank List",
-	  "player_toolbar_bar_button_mxinfo" => "Info about current map",
-	  "player_toolbar_bar_button_players" => "View list of Players",
-	  "player_toolbar_bar_button_visibility_toggle" => "Toggle UI visibility (F8)",
-	  "player_toolbar_bar_button_help" => "List of available commands"
+    "player_toolbar_bar_button_topdons" => "View list of top Donators",
+    "player_toolbar_bar_button_topsums" => "View Server Rank List",
+    "player_toolbar_bar_button_mxinfo" => "Info about current map",
+    "player_toolbar_bar_button_players" => "View list of Players",
+    "player_toolbar_bar_button_visibility_toggle" => "Toggle UI visibility (F8)",
+    "player_toolbar_bar_button_help" => "List of available commands"
   ];
 
   while(True) {
